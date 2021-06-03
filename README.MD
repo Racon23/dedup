@@ -1,3 +1,7 @@
+# Descripsion
+will use multicore to check md5
+
+# Usage
 python3 dedup.py [path] [-s -d]
 
 python3 dedup.py
