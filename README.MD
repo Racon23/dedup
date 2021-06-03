@@ -1,4 +1,6 @@
 # Descripsion
+replace same file with hardlink
+
 will use multicore to check md5
 
 # Usage

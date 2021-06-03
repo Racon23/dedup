@@ -9,8 +9,8 @@ dict = {}
 dryrun = False
 scan = False
 interactive = False
-small = False
-size = 1024*1024*2
+# small = False
+# size = 1024*1024*2
 idx = 1
 cores = mp.cpu_count()
 
@@ -36,26 +36,34 @@ def scan_file(rootDir):
 
 def async_md5(filepath, result_dict, result_lock, dryrun):
     check = hashlib.md5()
-    sz = os.path.getsize(filepath)
-    nsz = ''
-    nsz = str(sz)+'B'
-    if sz>1024:
-        sz = sz/1024
-        nsz = str(round(sz, 2))+'KB'
-    if sz>1024:
-        sz = sz/1024
-        nsz = str(round(sz, 2)) + 'MB'
-    if sz>1024:
-        sz = sz/1024
-        nsz = str(round(sz, 2))+ 'GB'
+    # sz = os.path.getsize(filepath)
+    sz = 0
 
     with open(filepath, "rb") as fp:
         while True:
-            # 100M
-            data = fp.read(104857600)
+            # 1M
+            data = fp.read(1048576)
             if not data:
                 break
             check.update(data)
+            sz = sz + len(data)
+    
+    nsz = ''
+    KB = 1024
+    MB = 1024*1024
+    GB = 1024*1024*1024
+    if sz>GB:
+        sz = sz/GB
+        nsz = str(round(sz, 2))+ 'GB'
+    elif sz>MB:
+        sz = sz/MB
+        nsz = str(round(sz, 2)) + 'MB'
+    elif sz>KB:
+        sz = sz/KB
+        nsz = str(round(sz, 2)) + 'KB'
+    else:
+        nsz = str(sz)+'B'
+
     file_md5 = check.hexdigest()
     with result_lock:
         outlog = open("./dedup_log.txt", "a", encoding="utf8")
