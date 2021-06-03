@@ -9,6 +9,8 @@ dict = {}
 dryrun = False
 scan = False
 interactive = False
+small = False
+size = 1024*1024*2
 idx = 1
 cores = mp.cpu_count()
 
@@ -33,18 +35,38 @@ def scan_file(rootDir):
 
 
 def async_md5(filepath, result_dict, result_lock, dryrun):
+    check = hashlib.md5()
+    sz = os.path.getsize(filepath)
+    nsz = ''
+    nsz = str(sz)+'B'
+    if sz>1024:
+        sz = sz/1024
+        nsz = str(round(sz, 2))+'KB'
+    if sz>1024:
+        sz = sz/1024
+        nsz = str(round(sz, 2)) + 'MB'
+    if sz>1024:
+        sz = sz/1024
+        nsz = str(round(sz, 2))+ 'GB'
+
     with open(filepath, "rb") as fp:
-        data = fp.read()
-    file_md5 = hashlib.md5(data).hexdigest()
+        while True:
+            # 100M
+            data = fp.read(104857600)
+            if not data:
+                break
+            check.update(data)
+    file_md5 = check.hexdigest()
     with result_lock:
         outlog = open("./dedup_log.txt", "a", encoding="utf8")
         if result_dict.get(file_md5) == None:
             result_dict[file_md5] = filepath
-            print(file_md5+" - "+filepath)
-            outlog.write(file_md5+" - "+filepath+'\n')
+            print(file_md5+" - " + nsz + " - " + filepath)
+            outlog.write(file_md5+" - "+nsz+" - " + filepath+'\n')
         else:
-            print("exist! " + result_dict[file_md5]+" - "+filepath)
-            outlog.write("exist! " + result_dict[file_md5]+" - "+filepath+'\n')
+            print("exist! " + nsz+" - " + result_dict[file_md5]+" - "+filepath)
+            outlog.write("exist! "+nsz+" - " +
+                         result_dict[file_md5]+" - "+filepath+'\n')
             if dryrun == False:
                 replace(result_dict[file_md5], filepath)
     return
@@ -83,9 +105,13 @@ if __name__ == "__main__":
         elif sys.argv[idx].strip('-') in ('dryrun', 'd'):
             dryrun = True
             idx = idx+1
+        elif sys.argv[idx].strip('-') in ('small', 'l'):
+            small = True
+            idx = idx+1
         elif sys.argv[idx].strip('-') in ('interactive', 'i'):
             interactive = True
             idx = idx+1
+
         else:
             print('no such arg')
     scan_file(path)
