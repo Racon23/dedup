@@ -13,21 +13,20 @@ interactive = False
 # size = 1024*1024*2
 recursive = False
 idx = 1
-cores = mp.cpu_count()
+
 
 
 # 扫描目录下所有文件
 def scan_file(rootDir,filelist):
-    for root, dirs, files in os.walk(rootDir):
-        for file in files:
-            if scan == True:
-                print(os.path.join(root, file))
-                of.write(os.path.join(root, file)+'\n')
-            else:
+    if recursive:
+        for root, dirs, files in os.walk(rootDir):
+            for file in files:
                 filelist.append(os.path.join(root, file))
-        if recursive:
-            for dir in dirs:
-                scan_file(dir,filelist)
+    else:
+        for file in os.listdir(rootDir):
+            fp = os.path.join(rootDir,file)
+            if os.path.isfile(fp):
+                filelist.append(fp)
 
 
 # 计算md5
@@ -93,6 +92,7 @@ def replace(oldfile, newfile):
 
 
 def multicore(filelist):
+    cores = mp.cpu_count()
     manager = mp.Manager()
     managed_locker = manager.Lock()
     managed_dict = manager.dict()
@@ -110,7 +110,13 @@ def multicore(filelist):
 def run(rootDir):
     filelist = []
     scan_file(rootDir,filelist)
-    multicore(filelist)
+    if scan:
+        for file in filelist:
+            print(file)
+            of.write(file+'\n')
+    else:
+        multicore(filelist)
+    print(len(filelist))
 
 if __name__ == "__main__":
     path = '.'
