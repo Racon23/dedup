@@ -11,37 +11,37 @@ scan = False
 interactive = False
 # small = False
 # size = 1024*1024*2
+recursive = False
 idx = 1
 cores = mp.cpu_count()
 
 
 # 扫描目录下所有文件
-def scan_file(rootDir):
-    filelist = []
+def scan_file(rootDir,filelist):
     for root, dirs, files in os.walk(rootDir):
         for file in files:
-            # print(os.path.join(root,file))
-            # of.write(os.path.join(root,file)+'\n')
             if scan == True:
                 print(os.path.join(root, file))
                 of.write(os.path.join(root, file)+'\n')
             else:
                 filelist.append(os.path.join(root, file))
-        for dir in dirs:
-            scan_file(dir)
-    multicore(filelist)
+        if recursive:
+            for dir in dirs:
+                scan_file(dir,filelist)
+
 
 # 计算md5
 
-
-def async_md5(filepath, result_dict, result_lock, dryrun):
+def async_md5(filepath, result_dict, result_lock, arg):
     check = hashlib.md5()
     # sz = os.path.getsize(filepath)
     sz = 0
+    length = arg['length']
+    dryrun = arg['dryrun']
 
     with open(filepath, "rb") as fp:
         while True:
-            # 1M
+            # 1M 分块读取，簇大小一般4k，根据自己喜好修改
             data = fp.read(1048576)
             if not data:
                 break
@@ -66,22 +66,24 @@ def async_md5(filepath, result_dict, result_lock, dryrun):
 
     file_md5 = check.hexdigest()
     with result_lock:
+        per = arg['per']+1
+        arg['per']=per
+        # pid = os.getpid()
+        curper = str(per)+'/'+str(length)
         outlog = open("./dedup_log.txt", "a", encoding="utf8")
         if result_dict.get(file_md5) == None:
             result_dict[file_md5] = filepath
-            print(file_md5+" - " + nsz + " - " + filepath)
-            outlog.write(file_md5+" - "+nsz+" - " + filepath+'\n')
+            print(curper+' - '+ file_md5+" - " + nsz + " - " + filepath)
+            outlog.write(curper+' - '+file_md5+" - "+nsz+" - " + filepath+'\n')
         else:
-            print("exist! " + nsz+" - " + result_dict[file_md5]+" - "+filepath)
-            outlog.write("exist! "+nsz+" - " +
+            print(curper+' - '+"exist! " + nsz+" - " + result_dict[file_md5]+" - "+filepath)
+            outlog.write(curper + " - "+ "exist! "+nsz+" - " +
                          result_dict[file_md5]+" - "+filepath+'\n')
             if dryrun == False:
                 replace(result_dict[file_md5], filepath)
     return
 
 # 替换为硬链接
-
-
 def replace(oldfile, newfile):
     if(os.path.exists(newfile)):
         os.remove(newfile)
@@ -94,11 +96,21 @@ def multicore(filelist):
     manager = mp.Manager()
     managed_locker = manager.Lock()
     managed_dict = manager.dict()
+    managed_arg = manager.dict()
     pool = mp.Pool(cores)
+    # enumerate 同时获取下标和值
+    managed_arg['length'] = len(filelist)
+    managed_arg['dryrun'] = dryrun
+    managed_arg['per'] = 0
     results = [pool.apply_async(async_md5, args=(
-        filepath, managed_dict, managed_locker, dryrun))for filepath in filelist]
+        filepath, managed_dict, managed_locker, managed_arg))for filepath in filelist]
     results = [p.get() for p in results]
 
+
+def run(rootDir):
+    filelist = []
+    scan_file(rootDir,filelist)
+    multicore(filelist)
 
 if __name__ == "__main__":
     path = '.'
@@ -113,6 +125,9 @@ if __name__ == "__main__":
         elif sys.argv[idx].strip('-') in ('dryrun', 'd'):
             dryrun = True
             idx = idx+1
+        elif sys.argv[idx].strip('-') in ('recursive', 'r'):
+            recursive = True
+            idx = idx+1
         elif sys.argv[idx].strip('-') in ('small', 'l'):
             small = True
             idx = idx+1
@@ -121,6 +136,14 @@ if __name__ == "__main__":
             idx = idx+1
 
         else:
-            print('no such arg')
-    scan_file(path)
+            print('no such arg!\n\n'+
+            'python3 dedup.py [path] [-s -d]\n'+
+            'python3 dedup.py /mnt/user/data -r\n\n'+
+            'path    default is current path \n'+
+            '-s,-scan    scan all files and output the filepaths to file\n'+
+            '-d,-dryrun  just check files,do not replace\n'+
+            '-r,-recursive   include subdirectories\n')
+            sys.exit(-1)
+    # scan_file(path)
+    run(path)
     sys.exit(-1)
