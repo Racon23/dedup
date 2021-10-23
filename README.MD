@@ -12,6 +12,8 @@ python3 dedup.py
 
 python3 dedup.py /mnt/user/data -r
 
+python3 dedup.py /mnt/user/data -s -r
+
 path    default is current path 
 
 -s,-scan    scan all files and output the filepaths to file
